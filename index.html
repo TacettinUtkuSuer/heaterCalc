@@ -42,7 +42,6 @@
   .switch input:checked + .tr { background: var(--acc); }
   .switch input:checked + .tr::after { left: 23px; background: #fff; }
   .hint { font-size: .75rem; color: var(--mut); margin-top: 6px; line-height: 1.4; }
-  .kpi.sm .v { font-size: 1.2rem; line-height: 1.5; }
   .hidden { display: none !important; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -112,10 +111,9 @@
 
     <div class="card">
       <h2>3 · Isıtıcı dirençleri (Ω)</h2>
-      <div class="seg" id="rmode" style="margin-bottom:8px">
+      <div class="seg two" id="rmode" style="margin-bottom:8px">
         <button data-v="elem" class="on">Eleman direnci</button>
         <button data-v="meas">Klemensler arası ölçüm</button>
-        <button data-v="res">Rezistans × adet</button>
       </div>
       <label class="switch" style="margin:4px 0 8px"><input type="checkbox" id="bal"><span class="tr"></span>Dengeli yük (tek değer)</label>
       <div class="tri" id="Rbox">
@@ -123,18 +121,17 @@
         <div><label class="f" id="l2">R</label><input type="number" id="R2" value="52.9" min="0" step="any"></div>
         <div><label class="f" id="l3">R</label><input type="number" id="R3" value="52.9" min="0" step="any"></div>
       </div>
-      <div id="resBox" class="hidden">
-        <div class="row">
-          <div><label class="f" style="margin-top:0">Tek rezistans (Ω)</label><input type="number" id="Rs" value="150" min="0" step="any"></div>
-          <div><label class="f" style="margin-top:0">Tolerans ± %</label><input type="number" id="Tol" value="5" min="0" max="99" step="any"></div>
-        </div>
-        <div class="tri" id="Nbox" style="margin-top:8px">
-          <div><label class="f" id="n1">Adet</label><input type="number" id="N1" value="3" min="1" step="1"></div>
-          <div><label class="f" id="n2">Adet</label><input type="number" id="N2" value="3" min="1" step="1"></div>
-          <div><label class="f" id="n3">Adet</label><input type="number" id="N3" value="3" min="1" step="1"></div>
+      <div class="hint" id="Rinfo"></div>
+      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
+        <label class="switch"><input type="checkbox" id="estOn"><span class="tr"></span>Rezistans sayısını tahmin et</label>
+        <div id="estBox" class="hidden">
+          <div class="row">
+            <div><label class="f">Tek rezistans (Ω)</label><input type="number" id="Rs" value="150" min="0" step="any"></div>
+            <div><label class="f">Tolerans ± %</label><input type="number" id="Tol" value="5" min="0" max="99" step="any"></div>
+          </div>
+          <div class="hint">Faz araları paralel rezistanslardan oluşur: adet ≈ tek rezistans ÷ faz arası eşdeğer direnç. Ölçümünüzden (veya girdiğiniz eleman direncinden) bulunan değer kullanılır.</div>
         </div>
       </div>
-      <div class="hint" id="Rinfo"></div>
     </div>
 
     <div class="card">
@@ -172,7 +169,7 @@
     <div class="kpis" id="kpis"></div>
 
     <div class="card" id="resCard">
-      <h2>Rezistans dağılımı (paralel)</h2>
+      <h2>Rezistans sayısı tahmini (paralel)</h2>
       <div class="tblwrap"><table id="tRes"></table></div>
     </div>
 
@@ -308,7 +305,7 @@ function update() {
   const msgs = [];
 
   // arayüz etiketleri
-  const meas = S.rmode === "meas", resm0 = S.rmode === "res";
+  const meas = S.rmode === "meas";
   const lbl = meas ? ["L1–L2 ölçülen", "L2–L3 ölçülen", "L3–L1 ölçülen"]
             : star ? ["R1 (L1–Y)", "R2 (L2–Y)", "R3 (L3–Y)"] : ["R12 (L1–L2)", "R23 (L2–L3)", "R31 (L3–L1)"];
   if (bal) { $("l1").textContent = meas ? "Klemensler arası ölçülen" : (star ? "Faz başı eleman R" : "Faz-faz arası eleman R"); }
@@ -317,18 +314,9 @@ function update() {
   $("R2").parentElement.classList.toggle("hidden", bal);
   $("R3").parentElement.classList.toggle("hidden", bal);
   $("Rbox").style.gridTemplateColumns = bal ? "1fr" : "";
-  $("Rbox").classList.toggle("hidden", resm0);
-  $("resBox").classList.toggle("hidden", !resm0);
-  $("resCard").classList.toggle("hidden", !resm0);
-  const nl = star ? ["L1–Y", "L2–Y", "L3–Y"] : ["L1–L2", "L2–L3", "L3–L1"];
-  $("n1").textContent = bal ? (star ? "Faz başına rezistans adedi" : "Faz-faz arası rezistans adedi") : "Adet · " + nl[0];
-  $("n2").textContent = "Adet · " + nl[1]; $("n3").textContent = "Adet · " + nl[2];
-  $("N2").parentElement.classList.toggle("hidden", bal);
-  $("N3").parentElement.classList.toggle("hidden", bal);
-  $("Nbox").style.gridTemplateColumns = bal ? "1fr" : "";
-  $("Rinfo").textContent = resm0
-    ? "Her faz arasına aynı değerde, birbirine paralel bağlı rezistanslar düşer. Eşdeğer direnç = tek rezistans ÷ adet. Tolerans için tüm rezistansların +tol / −tol durumundaki güç aralığı hesaplanır."
-    : meas
+  $("estBox").classList.toggle("hidden", !$("estOn").checked);
+  $("resCard").classList.toggle("hidden", !$("estOn").checked);
+  $("Rinfo").textContent = meas
     ? "Isıtıcı bağlı haldeyken (şebekeden ayrılmış) iki klemens arasında multimetre ile ölçülen değerleri girin; eleman dirençleri otomatik çözülür."
     : star ? "Her bir ısıtıcı elemanının (faz ile yıldız noktası arası) direnci." : "Her bir ısıtıcı elemanının (iki faz arası) direnci.";
   $("leakBox").classList.toggle("hidden", !leak);
@@ -343,17 +331,7 @@ function update() {
   $("Vinfo").textContent = isFinite(V) ? `U (F-F) = ${nf(VLL, 1)} V   ·   U₀ (F-N) = ${nf(Vph, 1)} V` : "";
 
   // dirençler
-  const resm = S.rmode === "res";
-  let r, cnt = null, Rs = NaN, tol = 0;
-  if (resm) {
-    Rs = num("Rs"); tol = num("Tol");
-    cnt = [num("N1"), bal ? num("N1") : num("N2"), bal ? num("N1") : num("N3")];
-    if (!(Rs > 0) || isNaN(tol) || tol >= 100 || cnt.some(x => isNaN(x) || x < 1 || !Number.isInteger(x)))
-      return render(null, ["Rezistans değeri > 0, tolerans 0–100 % arasında, adetler ise 1 veya daha büyük tam sayı olmalı."]);
-    r = cnt.map(n => Rs / n);
-  } else {
-    r = [num("R1"), bal ? num("R1") : num("R2"), bal ? num("R1") : num("R3")];
-  }
+  const r = [num("R1"), bal ? num("R1") : num("R2"), bal ? num("R1") : num("R3")];
   if (!isFinite(V) || r.some(x => isNaN(x))) return render(null, ["Lütfen geçerli (pozitif) değerler girin."]);
 
   let elemR = r.slice();
@@ -387,15 +365,24 @@ function update() {
   msgs.push(...c.msgs);
   const Rnom = Math.min(...elemR) === Math.max(...elemR);
 
-  // rezistans + tolerans: en kötü durum (hepsi +tol / hepsi −tol)
-  let res = null;
-  if (resm) {
-    const k = tol / 100;
-    const lo = calc(conn, elemR.map(x => x * (1 + k)), Vph, lk), hi = calc(conn, elemR.map(x => x * (1 - k)), Vph, lk);
-    res = { Rs, tol, cnt, elemR, Pmin: lo.Pload, Pmax: hi.Pload, Imax: Math.max(...hi.lineI.map(abs)) };
+  // rezistans sayısı tahmini
+  let est = null;
+  if ($("estOn").checked) {
+    const Rs = num("Rs"), tol = num("Tol");
+    if (!(Rs > 0) || isNaN(tol) || tol >= 100) msgs.push({ t: "bad", m: "Tek rezistans değeri > 0, tolerans 0–100 % arasında olmalı." });
+    else {
+      const k = tol / 100;
+      est = { Rs, tol, rows: elemR.map(R => {
+        if (!(R > 0)) return null;
+        const nx = Rs / R, lo = Rs * (1 - k) / R, hi = Rs * (1 + k) / R, ints = [];
+        for (let n = Math.max(1, Math.ceil(lo - 1e-9)); n <= Math.floor(hi + 1e-9) && ints.length < 40; n++) ints.push(n);
+        const near = Math.max(1, Math.round(nx));
+        return { R, nx, ints, near, dev: (R * near / Rs - 1) * 100 };
+      }) };
+    }
   }
 
-  render({ conn, star, leak, Vph, VLL, elems: c.elems, loads: c.loads, leaks: c.leaks, lineI: c.lineI, lineILoad: c.lineILoad, Pload: c.Pload, Pleak: c.Pleak, IN: c.IN, Ires: c.Ires, volt: c.volt, Rnom, res, it: !!(lk && lk.it) }, msgs);
+  render({ conn, star, leak, Vph, VLL, elems: c.elems, loads: c.loads, leaks: c.leaks, lineI: c.lineI, lineILoad: c.lineILoad, Pload: c.Pload, Pleak: c.Pleak, IN: c.IN, Ires: c.Ires, volt: c.volt, Rnom, est, it: !!(lk && lk.it) }, msgs);
 }
 
 /* ---------- devre çözümü (düğüm gerilimleri) ---------- */
@@ -467,10 +454,9 @@ function render(R, msgs) {
   const k = [];
   const kpi = (l, v, s = "", c = "") => k.push(`<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`);
   kpi("Isıtıcı gücü", fmt(R.Pload, "W"), R.Rnom ? "Dengeli yük" : "Dengesiz yük", "main");
-  if (R.res) {
-    const t = R.res;
-    kpi("Güç aralığı (± " + nf(t.tol, 1) + " %)", fmt(t.Pmin, "W") + " – " + fmt(t.Pmax, "W"), "Tüm rezistanslar +tol … −tol", "sm");
-    kpi("Toplam rezistans", String(t.cnt.reduce((a, b) => a + b, 0)) + " adet", t.cnt.join(" + ") + (R.star ? " (faz başına, paralel)" : " (faz arası, paralel)"));
+  if (R.est && R.est.rows.every(x => x)) {
+    const nn = R.est.rows.map(x => x.near);
+    kpi("Tahmini rezistans adedi", nn.reduce((a, b) => a + b, 0) + " adet", nn.join(" + ") + (R.star ? " (faz başına)" : " (faz arası)") + " · en yakın tam sayı", "");
   }
   const Imax = Math.max(...R.lineI.map(abs));
   kpi("Maks. hat akımı", fmt(Imax, "A"), R.lineI.map((x, i) => `L${i + 1}: ${fmt(abs(x), "A")}`).join(" · "));
@@ -495,13 +481,15 @@ function render(R, msgs) {
   $("kpis").innerHTML = k.join("");
 
   const col = ["var(--pa)", "var(--pb)", "var(--pc)"];
-  // rezistans dağılımı
-  if (R.res) {
-    const t = R.res, k = t.tol / 100;
-    let g = `<tr><th>Eleman</th><th>Adet</th><th>Tek rezistans</th><th>Eşdeğer R</th><th>Eşdeğer R (min–maks)</th><th>Rez. başına akım</th><th>Rez. başına güç</th></tr>`;
+  // rezistans sayısı tahmini
+  if (R.est) {
+    const t = R.est;
+    let g = `<tr><th>Eleman</th><th>Eşdeğer R</th><th>Tahmin (R<sub>tek</sub>÷R)</th><th>Toleransa uyan adet</th><th>En yakın</th><th>Sapma</th><th>Rez. başına akım</th><th>Rez. başına güç</th></tr>`;
     R.loads.forEach((e, i) => {
-      const iR = abs(e.U) / t.Rs, pR = abs(e.U) ** 2 / t.Rs;
-      g += `<tr><td>${e.name}</td><td>${t.cnt[i]}</td><td>${fmt(t.Rs, "Ω")} ±${nf(t.tol, 1)} %</td><td>${fmt(t.elemR[i], "Ω")}</td><td>${fmt(t.elemR[i] * (1 - k), "Ω")} – ${fmt(t.elemR[i] * (1 + k), "Ω")}</td><td>${fmt(iR, "A")}</td><td>${fmt(pR, "W")}</td></tr>`;
+      const x = t.rows[i];
+      if (!x) { g += `<tr><td>${e.name}</td><td colspan="7" style="text-align:left;color:var(--mut)">Direnç 0 – tahmin yapılamaz</td></tr>`; return; }
+      const ok = x.ints.length > 0;
+      g += `<tr><td>${e.name}</td><td>${fmt(x.R, "Ω")}</td><td>${nf(x.nx, 2)}</td><td style="color:${ok ? "var(--ok)" : "var(--bad)"}">${ok ? x.ints.join(", ") : "yok"}</td><td><b>${x.near}</b></td><td>${Math.abs(x.dev) < 0.05 ? "0,0" : (x.dev > 0 ? "+" : "") + nf(x.dev, 1)} %</td><td>${fmt(abs(e.U) / t.Rs, "A")}</td><td>${fmt(abs(e.U) ** 2 / t.Rs, "W")}</td></tr>`;
     });
     $("tRes").innerHTML = g;
   }
@@ -531,6 +519,7 @@ function render(R, msgs) {
 }
 
 $("leakOn").addEventListener("change", update);
+$("estOn").addEventListener("change", update);
 $("bal").addEventListener("change", update);
 update();
 </script>
