@@ -42,6 +42,7 @@
   .switch input:checked + .tr { background: var(--acc); }
   .switch input:checked + .tr::after { left: 23px; background: #fff; }
   .hint { font-size: .75rem; color: var(--mut); margin-top: 6px; line-height: 1.4; }
+  .kpi.sm .v { font-size: 1.2rem; line-height: 1.5; }
   .hidden { display: none !important; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -111,15 +112,27 @@
 
     <div class="card">
       <h2>3 · Isıtıcı dirençleri (Ω)</h2>
-      <div class="seg two" id="rmode" style="margin-bottom:8px">
+      <div class="seg" id="rmode" style="margin-bottom:8px">
         <button data-v="elem" class="on">Eleman direnci</button>
         <button data-v="meas">Klemensler arası ölçüm</button>
+        <button data-v="res">Rezistans × adet</button>
       </div>
       <label class="switch" style="margin:4px 0 8px"><input type="checkbox" id="bal"><span class="tr"></span>Dengeli yük (tek değer)</label>
       <div class="tri" id="Rbox">
         <div><label class="f" id="l1">R</label><input type="number" id="R1" value="52.9" min="0" step="any"></div>
         <div><label class="f" id="l2">R</label><input type="number" id="R2" value="52.9" min="0" step="any"></div>
         <div><label class="f" id="l3">R</label><input type="number" id="R3" value="52.9" min="0" step="any"></div>
+      </div>
+      <div id="resBox" class="hidden">
+        <div class="row">
+          <div><label class="f" style="margin-top:0">Tek rezistans (Ω)</label><input type="number" id="Rs" value="150" min="0" step="any"></div>
+          <div><label class="f" style="margin-top:0">Tolerans ± %</label><input type="number" id="Tol" value="5" min="0" max="99" step="any"></div>
+        </div>
+        <div class="tri" id="Nbox" style="margin-top:8px">
+          <div><label class="f" id="n1">Adet</label><input type="number" id="N1" value="3" min="1" step="1"></div>
+          <div><label class="f" id="n2">Adet</label><input type="number" id="N2" value="3" min="1" step="1"></div>
+          <div><label class="f" id="n3">Adet</label><input type="number" id="N3" value="3" min="1" step="1"></div>
+        </div>
       </div>
       <div class="hint" id="Rinfo"></div>
     </div>
@@ -157,6 +170,11 @@
   <section>
     <div id="msgs"></div>
     <div class="kpis" id="kpis"></div>
+
+    <div class="card" id="resCard">
+      <h2>Rezistans dağılımı (paralel)</h2>
+      <div class="tblwrap"><table id="tRes"></table></div>
+    </div>
 
     <div class="card">
       <h2>Isıtıcı elemanları</h2>
@@ -290,7 +308,7 @@ function update() {
   const msgs = [];
 
   // arayüz etiketleri
-  const meas = S.rmode === "meas";
+  const meas = S.rmode === "meas", resm0 = S.rmode === "res";
   const lbl = meas ? ["L1–L2 ölçülen", "L2–L3 ölçülen", "L3–L1 ölçülen"]
             : star ? ["R1 (L1–Y)", "R2 (L2–Y)", "R3 (L3–Y)"] : ["R12 (L1–L2)", "R23 (L2–L3)", "R31 (L3–L1)"];
   if (bal) { $("l1").textContent = meas ? "Klemensler arası ölçülen" : (star ? "Faz başı eleman R" : "Faz-faz arası eleman R"); }
@@ -299,7 +317,18 @@ function update() {
   $("R2").parentElement.classList.toggle("hidden", bal);
   $("R3").parentElement.classList.toggle("hidden", bal);
   $("Rbox").style.gridTemplateColumns = bal ? "1fr" : "";
-  $("Rinfo").textContent = meas
+  $("Rbox").classList.toggle("hidden", resm0);
+  $("resBox").classList.toggle("hidden", !resm0);
+  $("resCard").classList.toggle("hidden", !resm0);
+  const nl = star ? ["L1–Y", "L2–Y", "L3–Y"] : ["L1–L2", "L2–L3", "L3–L1"];
+  $("n1").textContent = bal ? (star ? "Faz başına rezistans adedi" : "Faz-faz arası rezistans adedi") : "Adet · " + nl[0];
+  $("n2").textContent = "Adet · " + nl[1]; $("n3").textContent = "Adet · " + nl[2];
+  $("N2").parentElement.classList.toggle("hidden", bal);
+  $("N3").parentElement.classList.toggle("hidden", bal);
+  $("Nbox").style.gridTemplateColumns = bal ? "1fr" : "";
+  $("Rinfo").textContent = resm0
+    ? "Her faz arasına aynı değerde, birbirine paralel bağlı rezistanslar düşer. Eşdeğer direnç = tek rezistans ÷ adet. Tolerans için tüm rezistansların +tol / −tol durumundaki güç aralığı hesaplanır."
+    : meas
     ? "Isıtıcı bağlı haldeyken (şebekeden ayrılmış) iki klemens arasında multimetre ile ölçülen değerleri girin; eleman dirençleri otomatik çözülür."
     : star ? "Her bir ısıtıcı elemanının (faz ile yıldız noktası arası) direnci." : "Her bir ısıtıcı elemanının (iki faz arası) direnci.";
   $("leakBox").classList.toggle("hidden", !leak);
@@ -314,7 +343,17 @@ function update() {
   $("Vinfo").textContent = isFinite(V) ? `U (F-F) = ${nf(VLL, 1)} V   ·   U₀ (F-N) = ${nf(Vph, 1)} V` : "";
 
   // dirençler
-  let r = [num("R1"), bal ? num("R1") : num("R2"), bal ? num("R1") : num("R3")];
+  const resm = S.rmode === "res";
+  let r, cnt = null, Rs = NaN, tol = 0;
+  if (resm) {
+    Rs = num("Rs"); tol = num("Tol");
+    cnt = [num("N1"), bal ? num("N1") : num("N2"), bal ? num("N1") : num("N3")];
+    if (!(Rs > 0) || isNaN(tol) || tol >= 100 || cnt.some(x => isNaN(x) || x < 1 || !Number.isInteger(x)))
+      return render(null, ["Rezistans değeri > 0, tolerans 0–100 % arasında, adetler ise 1 veya daha büyük tam sayı olmalı."]);
+    r = cnt.map(n => Rs / n);
+  } else {
+    r = [num("R1"), bal ? num("R1") : num("R2"), bal ? num("R1") : num("R3")];
+  }
   if (!isFinite(V) || r.some(x => isNaN(x))) return render(null, ["Lütfen geçerli (pozitif) değerler girin."]);
 
   let elemR = r.slice();
@@ -333,8 +372,35 @@ function update() {
     msgs.push({ t: "info", m: "Ölçümden çözülen eleman dirençleri: " + elemR.map((x, i) => (star ? `R${i + 1}` : ["R12", "R23", "R31"][i]) + " = " + fmt(x, "Ω")).join(" · ") });
   }
 
-  // devre kurulumu: düğümler
-  // bilinen: L1,L2,L3 (kaynak), N (kaynak nötrü = 0)
+  // toprak kaçağı ayarları
+  let lk = null;
+  if (leak) {
+    const u = parseFloat($("gUnit").value);
+    const gRs = [num("G1", true), num("G2", true), num("G3", true)].map(x => x * u);
+    if (gRs.some(x => isNaN(x))) return render(null, ["Toprak direnç değerlerini kontrol edin."]);
+    const g0 = conn === "starIso" ? num("G0", true) * u : Infinity;
+    if (isNaN(g0)) return render(null, ["Yıldız noktası toprak direncini kontrol edin."]);
+    lk = { gRs, g0, it: $("earth").value === "IT" };
+  }
+
+  const c = calc(conn, elemR, Vph, lk);
+  msgs.push(...c.msgs);
+  const Rnom = Math.min(...elemR) === Math.max(...elemR);
+
+  // rezistans + tolerans: en kötü durum (hepsi +tol / hepsi −tol)
+  let res = null;
+  if (resm) {
+    const k = tol / 100;
+    const lo = calc(conn, elemR.map(x => x * (1 + k)), Vph, lk), hi = calc(conn, elemR.map(x => x * (1 - k)), Vph, lk);
+    res = { Rs, tol, cnt, elemR, Pmin: lo.Pload, Pmax: hi.Pload, Imax: Math.max(...hi.lineI.map(abs)) };
+  }
+
+  render({ conn, star, leak, Vph, VLL, elems: c.elems, loads: c.loads, leaks: c.leaks, lineI: c.lineI, lineILoad: c.lineILoad, Pload: c.Pload, Pleak: c.Pleak, IN: c.IN, Ires: c.Ires, volt: c.volt, Rnom, res, it: !!(lk && lk.it) }, msgs);
+}
+
+/* ---------- devre çözümü (düğüm gerilimleri) ---------- */
+function calc(conn, elemR, Vph, lk) {
+  const star = conn !== "delta", msgs = [];
   const known = { L1: polar(Vph, 0), L2: polar(Vph, -120), L3: polar(Vph, 120), N: C(0) };
   const unknown = [];
   const elems = [];
@@ -343,19 +409,10 @@ function update() {
   if (star) ["L1", "L2", "L3"].forEach((p, i) => elems.push({ k: "load", name: `R${i + 1}`, a: p, b: starNode, R: elemR[i] }));
   else [["L1", "L2"], ["L2", "L3"], ["L3", "L1"]].forEach(([a, b], i) => elems.push({ k: "load", name: ["R12", "R23", "R31"][i], a, b, R: elemR[i] }));
 
-  let gRs = [];
-  if (leak) {
-    const u = parseFloat($("gUnit").value);
-    gRs = [num("G1", true), num("G2", true), num("G3", true)].map(x => x * u);
-    if (gRs.some(x => isNaN(x))) return render(null, ["Toprak direnç değerlerini kontrol edin."]);
-    const it = $("earth").value === "IT";
-    if (it) unknown.push("PE"); else known.PE = C(0);
-    ["L1", "L2", "L3"].forEach((p, i) => { if (isFinite(gRs[i])) elems.push({ k: "leak", name: `L${i + 1}–PE`, a: p, b: "PE", R: gRs[i] }); });
-    if (conn === "starIso") {
-      const g0 = num("G0", true) * u;
-      if (isNaN(g0)) return render(null, ["Yıldız noktası toprak direncini kontrol edin."]);
-      if (isFinite(g0)) elems.push({ k: "leak", name: "Y–PE", a: "Y", b: "PE", R: g0 });
-    }
+  if (lk) {
+    if (lk.it) unknown.push("PE"); else known.PE = C(0);
+    ["L1", "L2", "L3"].forEach((p, i) => { if (isFinite(lk.gRs[i])) elems.push({ k: "leak", name: `L${i + 1}–PE`, a: p, b: "PE", R: lk.gRs[i] }); });
+    if (conn === "starIso" && isFinite(lk.g0)) elems.push({ k: "leak", name: "Y–PE", a: "Y", b: "PE", R: lk.g0 });
   }
 
   // sıfır dirençli elemanlar: çok küçük direnç olarak modellenir (kısa devre uyarısı)
@@ -398,20 +455,23 @@ function update() {
   const loads = elems.filter(e => e.k === "load"), leaks = elems.filter(e => e.k === "leak");
   const Pload = loads.reduce((s, e) => s + e.P, 0), Pleak = leaks.reduce((s, e) => s + e.P, 0);
   const IN = conn === "starN" ? loads.reduce((s, e) => add(s, e.I), C(0)) : null; // nötrden kaynağa dönen
-  const Ires = leak ? leaks.reduce((s, e) => add(s, e.b === "PE" ? e.I : sc(e.I, -1)), C(0)) : null; // toprağa akan net
-  const Rnom = Math.min(...elemR) === Math.max(...elemR);
-
-  render({ conn, star, leak, Vph, VLL, elems, loads, leaks, lineI, lineILoad, Pload, Pleak, IN, Ires, volt, Rnom, it: leak && $("earth").value === "IT" }, msgs);
+  const Ires = lk ? leaks.reduce((s, e) => add(s, e.b === "PE" ? e.I : sc(e.I, -1)), C(0)) : null; // toprağa akan net
+  return { elems, loads, leaks, lineI, lineILoad, Pload, Pleak, IN, Ires, volt, msgs };
 }
 
 function render(R, msgs) {
   const box = $("msgs");
   box.innerHTML = (msgs || []).map(m => typeof m === "string" ? `<div class="msg bad">${m}</div>` : `<div class="msg ${m.t}">${m.m}</div>`).join("");
-  if (!R) { $("kpis").innerHTML = ""; $("tElem").innerHTML = $("tLine").innerHTML = $("tLeak").innerHTML = ""; return; }
+  if (!R) { $("kpis").innerHTML = ""; $("tElem").innerHTML = $("tLine").innerHTML = $("tLeak").innerHTML = $("tRes").innerHTML = ""; return; }
 
   const k = [];
   const kpi = (l, v, s = "", c = "") => k.push(`<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`);
   kpi("Isıtıcı gücü", fmt(R.Pload, "W"), R.Rnom ? "Dengeli yük" : "Dengesiz yük", "main");
+  if (R.res) {
+    const t = R.res;
+    kpi("Güç aralığı (± " + nf(t.tol, 1) + " %)", fmt(t.Pmin, "W") + " – " + fmt(t.Pmax, "W"), "Tüm rezistanslar +tol … −tol", "sm");
+    kpi("Toplam rezistans", String(t.cnt.reduce((a, b) => a + b, 0)) + " adet", t.cnt.join(" + ") + (R.star ? " (faz başına, paralel)" : " (faz arası, paralel)"));
+  }
   const Imax = Math.max(...R.lineI.map(abs));
   kpi("Maks. hat akımı", fmt(Imax, "A"), R.lineI.map((x, i) => `L${i + 1}: ${fmt(abs(x), "A")}`).join(" · "));
   if (R.conn === "starN") kpi("Nötr akımı", fmt(abs(R.IN), "A"), abs(R.IN) < 1e-6 ? "Dengeli – nötr akımı yok" : "Dengesizlikten kaynaklı", abs(R.IN) > 1e-3 ? "warn" : "ok");
@@ -435,6 +495,17 @@ function render(R, msgs) {
   $("kpis").innerHTML = k.join("");
 
   const col = ["var(--pa)", "var(--pb)", "var(--pc)"];
+  // rezistans dağılımı
+  if (R.res) {
+    const t = R.res, k = t.tol / 100;
+    let g = `<tr><th>Eleman</th><th>Adet</th><th>Tek rezistans</th><th>Eşdeğer R</th><th>Eşdeğer R (min–maks)</th><th>Rez. başına akım</th><th>Rez. başına güç</th></tr>`;
+    R.loads.forEach((e, i) => {
+      const iR = abs(e.U) / t.Rs, pR = abs(e.U) ** 2 / t.Rs;
+      g += `<tr><td>${e.name}</td><td>${t.cnt[i]}</td><td>${fmt(t.Rs, "Ω")} ±${nf(t.tol, 1)} %</td><td>${fmt(t.elemR[i], "Ω")}</td><td>${fmt(t.elemR[i] * (1 - k), "Ω")} – ${fmt(t.elemR[i] * (1 + k), "Ω")}</td><td>${fmt(iR, "A")}</td><td>${fmt(pR, "W")}</td></tr>`;
+    });
+    $("tRes").innerHTML = g;
+  }
+
   // eleman tablosu
   let h = `<tr><th>Eleman</th><th>Direnç</th><th>Gerilim</th><th>Akım</th><th>Güç</th><th>Pay</th></tr>`;
   R.loads.forEach(e => h += `<tr><td>${e.name}</td><td>${fmt(e.R, "Ω")}</td><td>${fmt(abs(e.U), "V")}</td><td>${fmt(abs(e.I), "A")}</td><td>${fmt(e.P, "W")}</td><td>${nf(R.Pload ? 100 * e.P / R.Pload : 0, 1)} %</td></tr>`);
