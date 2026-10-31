@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isıtıcı Güç &amp; Kaçak Akım Hesabı</title>
+<style>
+  :root {
+    --bg: #0f1720; --card: #17212c; --card2: #1e2a37; --line: #2c3a4a;
+    --txt: #e6edf3; --mut: #8ea0b3; --acc: #f2a33a; --ok: #3fb950; --bad: #f85149; --warn: #d29922;
+    --pa: #e5534b; --pb: #e3b341; --pc: #539bf5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--txt); }
+  header { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header span { color: var(--mut); font-size: .85rem; }
+  main { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 16px; padding: 16px; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mut); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .seg.two { grid-template-columns: repeat(2, 1fr); }
+  .seg button { background: var(--card2); color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 8px 4px; cursor: pointer; font-size: .85rem; line-height: 1.2; }
+  .seg button b { display: block; font-size: 1.3rem; }
+  .seg button.on { border-color: var(--acc); background: #2b2416; color: var(--acc); }
+  label.f { display: block; font-size: .8rem; color: var(--mut); margin: 8px 0 3px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > * { flex: 1; }
+  input[type=number], select { width: 100%; background: #0c131a; color: var(--txt); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font-size: 1rem; }
+  input[type=number]:focus, select:focus { outline: none; border-color: var(--acc); }
+  input.err { border-color: var(--bad); }
+  .tri { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tri label.f { margin-top: 0; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chips button { background: var(--card2); border: 1px solid var(--line); color: var(--mut); border-radius: 999px; padding: 3px 10px; font-size: .78rem; cursor: pointer; }
+  .chips button:hover { color: var(--txt); border-color: var(--acc); }
+  .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-size: .95rem; }
+  .switch input { display: none; }
+  .switch .tr { width: 44px; height: 24px; border-radius: 12px; background: #34414f; position: relative; transition: .2s; flex: none; }
+  .switch .tr::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #cfd8e3; transition: .2s; }
+  .switch input:checked + .tr { background: var(--acc); }
+  .switch input:checked + .tr::after { left: 23px; background: #fff; }
+  .hint { font-size: .75rem; color: var(--mut); margin-top: 6px; line-height: 1.4; }
+  .hidden { display: none !important; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .kpi .l { font-size: .75rem; color: var(--mut); text-transform: uppercase; letter-spacing: .06em; }
+  .kpi .v { font-size: 1.7rem; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .s { font-size: .78rem; color: var(--mut); margin-top: 2px; }
+  .kpi.main { border-color: var(--acc); }
+  .kpi.main .v { color: var(--acc); font-size: 2.1rem; }
+  .kpi.bad { border-color: var(--bad); } .kpi.bad .v { color: var(--bad); }
+  .kpi.warn { border-color: var(--warn); } .kpi.warn .v { color: var(--warn); }
+  .kpi.ok .v { color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: .9rem; }
+  th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--mut); font-weight: 600; font-size: .75rem; text-transform: uppercase; }
+  tr.tot td { font-weight: 700; border-top: 2px solid var(--line); }
+  .tblwrap { overflow-x: auto; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .msg { padding: 9px 12px; border-radius: 8px; font-size: .85rem; margin-bottom: 8px; }
+  .msg.bad { background: #3a1618; color: #ffb3ad; border: 1px solid #6e2a2a; }
+  .msg.warn { background: #33280f; color: #f0d58a; border: 1px solid #5c4a17; }
+  .msg.info { background: #12263a; color: #a9cdf5; border: 1px solid #23425f; }
+  svg text { font-family: inherit; }
+  .diag { display: flex; justify-content: center; }
+  footer { color: var(--mut); font-size: .75rem; text-align: center; padding: 10px 16px 24px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Isıtıcı Güç &amp; Kaçak Akım Hesabı</h1>
+  <span>3 fazlı rezistif yük — Δ / Y (nötrsüz) / Y (nötrlü)</span>
+</header>
+
+<main>
+  <!-- ========== GİRİŞLER ========== -->
+  <section>
+    <div class="card">
+      <h2>1 · Bağlantı tipi</h2>
+      <div class="seg" id="conn">
+        <button data-v="delta" class="on"><b>Δ</b>Üçgen</button>
+        <button data-v="starIso"><b>Y</b>Yıldız nötrsüz</button>
+        <button data-v="starN"><b>Y<sub>N</sub></b>Yıldız nötrlü</button>
+      </div>
+      <div class="diag" id="diag"></div>
+    </div>
+
+    <div class="card">
+      <h2>2 · Şebeke gerilimi</h2>
+      <div class="row">
+        <div><input type="number" id="V" value="400" min="0" step="any"></div>
+        <div>
+          <select id="Vtype">
+            <option value="LL">V · Faz-Faz (U)</option>
+            <option value="LN">V · Faz-Nötr (U₀)</option>
+          </select>
+        </div>
+      </div>
+      <div class="chips">
+        <button data-vv="400" data-vt="LL">400 V F-F</button>
+        <button data-vv="230" data-vt="LN">230 V F-N</button>
+        <button data-vv="380" data-vt="LL">380 V F-F</button>
+        <button data-vv="220" data-vt="LN">220 V F-N</button>
+        <button data-vv="690" data-vt="LL">690 V F-F</button>
+      </div>
+      <div class="hint" id="Vinfo"></div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Isıtıcı dirençleri (Ω)</h2>
+      <div class="seg two" id="rmode" style="margin-bottom:8px">
+        <button data-v="elem" class="on">Eleman direnci</button>
+        <button data-v="meas">Klemensler arası ölçüm</button>
+      </div>
+      <label class="switch" style="margin:4px 0 8px"><input type="checkbox" id="bal"><span class="tr"></span>Dengeli yük (tek değer)</label>
+      <div class="tri" id="Rbox">
+        <div><label class="f" id="l1">R</label><input type="number" id="R1" value="52.9" min="0" step="any"></div>
+        <div><label class="f" id="l2">R</label><input type="number" id="R2" value="52.9" min="0" step="any"></div>
+        <div><label class="f" id="l3">R</label><input type="number" id="R3" value="52.9" min="0" step="any"></div>
+      </div>
+      <div class="hint" id="Rinfo"></div>
+    </div>
+
+    <div class="card">
+      <h2>4 · Toprak kaçağı (opsiyonel)</h2>
+      <label class="switch"><input type="checkbox" id="leakOn"><span class="tr"></span>Faz – Toprak izolasyon direnci hesaba katılsın</label>
+      <div id="leakBox" class="hidden">
+        <label class="f">Birim</label>
+        <select id="gUnit">
+          <option value="1">Ω</option>
+          <option value="1000" selected>kΩ</option>
+          <option value="1000000">MΩ</option>
+        </select>
+        <div class="tri" style="margin-top:8px">
+          <div><label class="f"><span class="dot" style="background:var(--pa)"></span>L1 – PE</label><input type="number" id="G1" value="100" min="0" step="any"></div>
+          <div><label class="f"><span class="dot" style="background:var(--pb)"></span>L2 – PE</label><input type="number" id="G2" placeholder="∞" min="0" step="any"></div>
+          <div><label class="f"><span class="dot" style="background:var(--pc)"></span>L3 – PE</label><input type="number" id="G3" placeholder="∞" min="0" step="any"></div>
+        </div>
+        <div id="gStarBox">
+          <label class="f">Yıldız noktası – PE</label>
+          <input type="number" id="G0" placeholder="∞ (bağlı değil)" min="0" step="any">
+        </div>
+        <label class="f">Şebeke topraklama sistemi</label>
+        <select id="earth">
+          <option value="TN">Nötr topraklı (TN / TT)</option>
+          <option value="IT">İzole nötr (IT)</option>
+        </select>
+        <div class="hint">Boş bırakılan alan = sonsuz direnç (kaçak yok). 0 girilirse doğrudan toprak teması (kısa devre) kabul edilir.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SONUÇLAR ========== -->
+  <section>
+    <div id="msgs"></div>
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <h2>Isıtıcı elemanları</h2>
+      <div class="tblwrap"><table id="tElem"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Hat akımları</h2>
+      <div class="tblwrap"><table id="tLine"></table></div>
+    </div>
+
+    <div class="card" id="leakCard">
+      <h2>Toprak kaçak akımları</h2>
+      <div class="tblwrap"><table id="tLeak"></table></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Saf omik (rezistif) yük ve simetrik, ideal (iç empedansı sıfır) 3 fazlı şebeke kabul edilmiştir. Faz sırası L1∠0°, L2∠−120°, L3∠+120°.<br>
+  Hesap, düğüm gerilimleri yöntemiyle (karmaşık sayılarla) yapılır; dengesiz yük ve kaçak akımlar fazörel olarak toplanır.
+</footer>
+
+<script>
+"use strict";
+/* ---------- karmaşık sayı yardımcıları ---------- */
+const C = (re, im = 0) => ({ re, im });
+const add = (a, b) => C(a.re + b.re, a.im + b.im);
+const sub = (a, b) => C(a.re - b.re, a.im - b.im);
+const mul = (a, b) => C(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
+const div = (a, b) => { const d = b.re * b.re + b.im * b.im; return C((a.re * b.re + a.im * b.im) / d, (a.im * b.re - a.re * b.im) / d); };
+const sc = (a, k) => C(a.re * k, a.im * k);
+const abs = a => Math.hypot(a.re, a.im);
+const ang = a => Math.atan2(a.im, a.re) * 180 / Math.PI;
+const polar = (m, deg) => C(m * Math.cos(deg * Math.PI / 180), m * Math.sin(deg * Math.PI / 180));
+
+/* Karmaşık Gauss eliminasyonu (kısmi pivotlama) */
+function solve(A, b) {
+  const n = b.length;
+  for (let i = 0; i < n; i++) {
+    let p = i;
+    for (let r = i + 1; r < n; r++) if (abs(A[r][i]) > abs(A[p][i])) p = r;
+    [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]];
+    for (let r = i + 1; r < n; r++) {
+      const f = div(A[r][i], A[i][i]);
+      for (let c = i; c < n; c++) A[r][c] = sub(A[r][c], mul(f, A[i][c]));
+      b[r] = sub(b[r], mul(f, b[i]));
+    }
+  }
+  const x = new Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    let s = b[i];
+    for (let c = i + 1; c < n; c++) s = sub(s, mul(A[i][c], x[c]));
+    x[i] = div(s, A[i][i]);
+  }
+  return x;
+}
+
+/* ---------- biçimlendirme ---------- */
+const nf = (x, d) => x.toLocaleString("tr-TR", { minimumFractionDigits: d, maximumFractionDigits: d });
+function fmt(x, unit) {
+  if (!isFinite(x)) return "∞";
+  const a = Math.abs(x);
+  if (a < 1e-9) return "0 " + unit;
+  const pre = [[1e6, "M"], [1e3, "k"], [1, ""], [1e-3, "m"], [1e-6, "µ"]];
+  for (const [k, p] of pre) if (a >= k * 0.9995) {
+    const v = x / k, av = Math.abs(v);
+    return nf(v, av >= 100 ? 1 : av >= 10 ? 2 : 3) + " " + p + unit;
+  }
+  return nf(x / 1e-6, 3) + " µ" + unit;
+}
+const fA = x => nf(x, 1) + "°";
+
+/* ---------- durum ---------- */
+const $ = id => document.getElementById(id);
+const S = { conn: "delta", rmode: "elem" };
+
+function segInit(id, key) {
+  $(id).querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    $(id).querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    S[key] = b.dataset.v; update();
+  }));
+}
+segInit("conn", "conn");
+segInit("rmode", "rmode");
+document.querySelectorAll("[data-vv]").forEach(b => b.addEventListener("click", () => {
+  $("V").value = b.dataset.vv; $("Vtype").value = b.dataset.vt; update();
+}));
+document.querySelectorAll("input,select").forEach(el => el.addEventListener("input", update));
+
+function num(id, allowEmptyInf) {
+  const el = $(id), s = el.value.trim();
+  if (s === "" && allowEmptyInf) { el.classList.remove("err"); return Infinity; }
+  const v = parseFloat(s.replace(",", "."));
+  const bad = !isFinite(v) || v < 0;
+  el.classList.toggle("err", bad);
+  return bad ? NaN : v;
+}
+
+/* ---------- şema ---------- */
+function drawDiagram(conn, leak) {
+  const col = ["var(--pa)", "var(--pb)", "var(--pc)"];
+  const res = (x1, y1, x2, y2, lbl) => {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, a = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#8ea0b3" stroke-width="2"/>
+      <g transform="translate(${mx},${my}) rotate(${a})"><rect x="-16" y="-6" width="32" height="12" rx="2" fill="#17212c" stroke="#f2a33a" stroke-width="2"/></g>
+      <text x="${mx}" y="${my}" dx="${lbl[1]}" dy="${lbl[2]}" fill="#e6edf3" font-size="11" text-anchor="middle">${lbl[0]}</text>`;
+  };
+  const P = [[150, 38], [62, 168], [238, 168]];
+  let s = "";
+  if (conn === "delta") {
+    s += res(...P[0], ...P[1], ["R12", -20, -6]) + res(...P[1], ...P[2], ["R23", 0, 22]) + res(...P[2], ...P[0], ["R31", 20, -6]);
+  } else {
+    const O = [150, 122];
+    s += res(...P[0], ...O, ["R1", 22, 0]) + res(...P[1], ...O, ["R2", -6, 20]) + res(...P[2], ...O, ["R3", 6, 20]);
+    s += `<circle cx="${O[0]}" cy="${O[1]}" r="4" fill="#e6edf3"/>`;
+    if (conn === "starN") s += `<line x1="150" y1="126" x2="150" y2="196" stroke="#539bf5" stroke-width="2" stroke-dasharray="5 3"/><text x="160" y="196" fill="#539bf5" font-size="11">N</text>`;
+  }
+  P.forEach((p, i) => {
+    s += `<circle cx="${p[0]}" cy="${p[1]}" r="6" fill="${col[i]}"/><text x="${p[0]}" y="${p[1]}" dx="${i === 0 ? 0 : i === 1 ? -16 : 16}" dy="${i === 0 ? -10 : 4}" fill="${col[i]}" font-size="12" font-weight="700" text-anchor="middle">L${i + 1}</text>`;
+    if (leak) s += `<line x1="${p[0]}" y1="${p[1]}" x2="${p[0] + (i === 0 ? 40 : 0)}" y2="${i === 0 ? p[1] : 196}" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  });
+  if (leak) s += `<line x1="40" y1="200" x2="260" y2="200" stroke="#3fb950" stroke-width="2"/><text x="268" y="204" fill="#3fb950" font-size="11">PE</text>
+    <line x1="190" y1="38" x2="190" y2="200" stroke="#3fb950" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  $("diag").innerHTML = `<svg viewBox="0 0 300 212" width="280" height="198">${s}</svg>`;
+}
+
+/* ---------- ana hesap ---------- */
+function update() {
+  const conn = S.conn, star = conn !== "delta", leak = $("leakOn").checked, bal = $("bal").checked;
+  const msgs = [];
+
+  // arayüz etiketleri
+  const meas = S.rmode === "meas";
+  const lbl = meas ? ["L1–L2 ölçülen", "L2–L3 ölçülen", "L3–L1 ölçülen"]
+            : star ? ["R1 (L1–Y)", "R2 (L2–Y)", "R3 (L3–Y)"] : ["R12 (L1–L2)", "R23 (L2–L3)", "R31 (L3–L1)"];
+  if (bal) { $("l1").textContent = meas ? "Klemensler arası ölçülen" : (star ? "Faz başı eleman R" : "Faz-faz arası eleman R"); }
+  else { $("l1").textContent = lbl[0]; }
+  $("l2").textContent = lbl[1]; $("l3").textContent = lbl[2];
+  $("R2").parentElement.classList.toggle("hidden", bal);
+  $("R3").parentElement.classList.toggle("hidden", bal);
+  $("Rbox").style.gridTemplateColumns = bal ? "1fr" : "";
+  $("Rinfo").textContent = meas
+    ? "Isıtıcı bağlı haldeyken (şebekeden ayrılmış) iki klemens arasında multimetre ile ölçülen değerleri girin; eleman dirençleri otomatik çözülür."
+    : star ? "Her bir ısıtıcı elemanının (faz ile yıldız noktası arası) direnci." : "Her bir ısıtıcı elemanının (iki faz arası) direnci.";
+  $("leakBox").classList.toggle("hidden", !leak);
+  $("gStarBox").classList.toggle("hidden", conn !== "starIso");
+  $("leakCard").classList.toggle("hidden", !leak);
+  drawDiagram(conn, leak);
+
+  // gerilim
+  const V = num("V");
+  const Vph = $("Vtype").value === "LL" ? V / Math.sqrt(3) : V;
+  const VLL = Vph * Math.sqrt(3);
+  $("Vinfo").textContent = isFinite(V) ? `U (F-F) = ${nf(VLL, 1)} V   ·   U₀ (F-N) = ${nf(Vph, 1)} V` : "";
+
+  // dirençler
+  let r = [num("R1"), bal ? num("R1") : num("R2"), bal ? num("R1") : num("R3")];
+  if (!isFinite(V) || r.some(x => isNaN(x))) return render(null, ["Lütfen geçerli (pozitif) değerler girin."]);
+
+  let elemR = r.slice();
+  if (meas) {
+    // ölçülen klemens dirençleri -> eşdeğer yıldız
+    const [m12, m23, m31] = r;
+    const ys = [(m12 + m31 - m23) / 2, (m12 + m23 - m31) / 2, (m23 + m31 - m12) / 2];
+    if (ys.some(y => y < -1e-9)) return render(null, ["Ölçülen değerler tutarsız: herhangi iki ölçümün toplamı üçüncüden küçük olamaz."]);
+    ys.forEach((y, i) => ys[i] = Math.max(y, 0));
+    if (star) elemR = ys;
+    else {
+      const [a, b, c] = ys, sp = a * b + b * c + c * a;
+      if (sp <= 0) return render(null, ["Ölçülen değerlerden üçgen eleman dirençleri çözülemedi (en az iki ölçüm sıfırdan büyük olmalı)."]);
+      elemR = [sp / c, sp / a, sp / b]; // R12, R23, R31
+    }
+    msgs.push({ t: "info", m: "Ölçümden çözülen eleman dirençleri: " + elemR.map((x, i) => (star ? `R${i + 1}` : ["R12", "R23", "R31"][i]) + " = " + fmt(x, "Ω")).join(" · ") });
+  }
+
+  // devre kurulumu: düğümler
+  // bilinen: L1,L2,L3 (kaynak), N (kaynak nötrü = 0)
+  const known = { L1: polar(Vph, 0), L2: polar(Vph, -120), L3: polar(Vph, 120), N: C(0) };
+  const unknown = [];
+  const elems = [];
+  const starNode = conn === "starN" ? "N" : "Y";
+  if (conn === "starIso") unknown.push("Y");
+  if (star) ["L1", "L2", "L3"].forEach((p, i) => elems.push({ k: "load", name: `R${i + 1}`, a: p, b: starNode, R: elemR[i] }));
+  else [["L1", "L2"], ["L2", "L3"], ["L3", "L1"]].forEach(([a, b], i) => elems.push({ k: "load", name: ["R12", "R23", "R31"][i], a, b, R: elemR[i] }));
+
+  let gRs = [];
+  if (leak) {
+    const u = parseFloat($("gUnit").value);
+    gRs = [num("G1", true), num("G2", true), num("G3", true)].map(x => x * u);
+    if (gRs.some(x => isNaN(x))) return render(null, ["Toprak direnç değerlerini kontrol edin."]);
+    const it = $("earth").value === "IT";
+    if (it) unknown.push("PE"); else known.PE = C(0);
+    ["L1", "L2", "L3"].forEach((p, i) => { if (isFinite(gRs[i])) elems.push({ k: "leak", name: `L${i + 1}–PE`, a: p, b: "PE", R: gRs[i] }); });
+    if (conn === "starIso") {
+      const g0 = num("G0", true) * u;
+      if (isNaN(g0)) return render(null, ["Yıldız noktası toprak direncini kontrol edin."]);
+      if (isFinite(g0)) elems.push({ k: "leak", name: "Y–PE", a: "Y", b: "PE", R: g0 });
+    }
+  }
+
+  // sıfır dirençli elemanlar: çok küçük direnç olarak modellenir (kısa devre uyarısı)
+  const shorted = elems.filter(e => e.R === 0);
+  shorted.forEach(e => { e.R = 1e-6; });
+  shorted.forEach(e => {
+    const bothKnown = (e.a in known) && (e.b in known);
+    msgs.push({ t: "bad", m: `${e.name} = 0 Ω → ${bothKnown ? "DOĞRUDAN KISA DEVRE! Koruma cihazı açar; gösterilen değerler gerçekçi değildir." : "doğrudan bağlantı (0 Ω) olarak hesaplandı."}` });
+  });
+
+  // düğüm denklemleri
+  const n = unknown.length, idx = Object.fromEntries(unknown.map((u, i) => [u, i]));
+  const volt = { ...known };
+  if (n) {
+    const A = Array.from({ length: n }, () => Array.from({ length: n }, () => C(0)));
+    const b = Array.from({ length: n }, () => C(0));
+    for (const e of elems) {
+      const g = 1 / e.R;
+      for (const [p, q] of [[e.a, e.b], [e.b, e.a]]) {
+        if (!(p in idx)) continue;
+        const i = idx[p];
+        A[i][i] = add(A[i][i], C(g));
+        if (q in idx) A[i][idx[q]] = sub(A[i][idx[q]], C(g));
+        else b[i] = add(b[i], sc(known[q], g));
+      }
+    }
+    for (let i = 0; i < n; i++) A[i][i] = add(A[i][i], C(1e-15)); // yüzen düğüm koruması
+    const x = solve(A, b);
+    unknown.forEach((u, i) => volt[u] = x[i]);
+  }
+
+  // eleman sonuçları
+  for (const e of elems) {
+    e.U = sub(volt[e.a], volt[e.b]);
+    e.I = sc(e.U, 1 / e.R);
+    e.P = abs(e.U) ** 2 / e.R;
+  }
+  const lineI = ["L1", "L2", "L3"].map(p => elems.reduce((s, e) => e.a === p ? add(s, e.I) : e.b === p ? sub(s, e.I) : s, C(0)));
+  const lineILoad = ["L1", "L2", "L3"].map(p => elems.filter(e => e.k === "load").reduce((s, e) => e.a === p ? add(s, e.I) : e.b === p ? sub(s, e.I) : s, C(0)));
+  const loads = elems.filter(e => e.k === "load"), leaks = elems.filter(e => e.k === "leak");
+  const Pload = loads.reduce((s, e) => s + e.P, 0), Pleak = leaks.reduce((s, e) => s + e.P, 0);
+  const IN = conn === "starN" ? loads.reduce((s, e) => add(s, e.I), C(0)) : null; // nötrden kaynağa dönen
+  const Ires = leak ? leaks.reduce((s, e) => add(s, e.b === "PE" ? e.I : sc(e.I, -1)), C(0)) : null; // toprağa akan net
+  const Rnom = Math.min(...elemR) === Math.max(...elemR);
+
+  render({ conn, star, leak, Vph, VLL, elems, loads, leaks, lineI, lineILoad, Pload, Pleak, IN, Ires, volt, Rnom, it: leak && $("earth").value === "IT" }, msgs);
+}
+
+function render(R, msgs) {
+  const box = $("msgs");
+  box.innerHTML = (msgs || []).map(m => typeof m === "string" ? `<div class="msg bad">${m}</div>` : `<div class="msg ${m.t}">${m.m}</div>`).join("");
+  if (!R) { $("kpis").innerHTML = ""; $("tElem").innerHTML = $("tLine").innerHTML = $("tLeak").innerHTML = ""; return; }
+
+  const k = [];
+  const kpi = (l, v, s = "", c = "") => k.push(`<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`);
+  kpi("Isıtıcı gücü", fmt(R.Pload, "W"), R.Rnom ? "Dengeli yük" : "Dengesiz yük", "main");
+  const Imax = Math.max(...R.lineI.map(abs));
+  kpi("Maks. hat akımı", fmt(Imax, "A"), R.lineI.map((x, i) => `L${i + 1}: ${fmt(abs(x), "A")}`).join(" · "));
+  if (R.conn === "starN") kpi("Nötr akımı", fmt(abs(R.IN), "A"), abs(R.IN) < 1e-6 ? "Dengeli – nötr akımı yok" : "Dengesizlikten kaynaklı", abs(R.IN) > 1e-3 ? "warn" : "ok");
+  if (R.conn === "starIso") {
+    const dv = abs(R.volt.Y);
+    kpi("Yıldız noktası kayması", fmt(dv, "V"), "Yıldız noktası – şebeke nötrü", dv > 0.05 * R.Vph ? "warn" : "ok");
+  }
+  if (R.leak) {
+    if (R.it) {
+      const vpe = abs(R.volt.PE);
+      kpi("Toprak potansiyeli", fmt(vpe, "V"), "İzole şebeke: PE – kaynak nötrü", vpe > 50 ? "bad" : "");
+      const Imx = Math.max(0, ...R.leaks.map(e => abs(e.I)));
+      kpi("Maks. kaçak akım", fmt(Imx, "A"), "IT: kaçak akımlar kendi içinde kapanır", "");
+    } else {
+      const ir = abs(R.Ires);
+      kpi("Toplam kaçak akım (I∆)", fmt(ir, "A"), ir >= 0.03 ? "≥ 30 mA – kaçak akım rölesi (RCD) açar" : ir >= 0.015 ? "30 mA RCD açma bölgesine yakın" : "30 mA RCD için güvenli", ir >= 0.03 ? "bad" : ir >= 0.015 ? "warn" : "ok");
+    }
+    kpi("Kaçak güç", fmt(R.Pleak, "W"), "İzolasyonda ısıya dönüşen");
+    kpi("Toplam çekilen güç", fmt(R.Pload + R.Pleak, "W"), "Isıtıcı + kaçak");
+  }
+  $("kpis").innerHTML = k.join("");
+
+  const col = ["var(--pa)", "var(--pb)", "var(--pc)"];
+  // eleman tablosu
+  let h = `<tr><th>Eleman</th><th>Direnç</th><th>Gerilim</th><th>Akım</th><th>Güç</th><th>Pay</th></tr>`;
+  R.loads.forEach(e => h += `<tr><td>${e.name}</td><td>${fmt(e.R, "Ω")}</td><td>${fmt(abs(e.U), "V")}</td><td>${fmt(abs(e.I), "A")}</td><td>${fmt(e.P, "W")}</td><td>${nf(R.Pload ? 100 * e.P / R.Pload : 0, 1)} %</td></tr>`);
+  h += `<tr class="tot"><td>Toplam</td><td></td><td></td><td></td><td>${fmt(R.Pload, "W")}</td><td>100 %</td></tr>`;
+  $("tElem").innerHTML = h;
+
+  // hat tablosu
+  h = `<tr><th>Hat</th><th>Akım</th><th>Açı</th>${R.leak ? "<th>Isıtıcıya giden</th>" : ""}<th>Faz-Nötr ger.</th></tr>`;
+  R.lineI.forEach((x, i) => h += `<tr><td><span class="dot" style="background:${col[i]}"></span>L${i + 1}</td><td>${fmt(abs(x), "A")}</td><td>${fA(ang(x))}</td>${R.leak ? `<td>${fmt(abs(R.lineILoad[i]), "A")}</td>` : ""}<td>${fmt(R.Vph, "V")}</td></tr>`);
+  if (R.IN) h += `<tr><td><span class="dot" style="background:#539bf5"></span>N</td><td>${fmt(abs(R.IN), "A")}</td><td>${abs(R.IN) > 1e-9 ? fA(ang(R.IN)) : "–"}</td>${R.leak ? "<td></td>" : ""}<td>0 V</td></tr>`;
+  if (R.conn === "starIso") h += `<tr><td>Yıldız nok. (Y)</td><td colspan="${R.leak ? 3 : 2}" style="text-align:right;color:var(--mut)">Nötre göre gerilim</td><td>${fmt(abs(R.volt.Y), "V")}</td></tr>`;
+  $("tLine").innerHTML = h;
+
+  // kaçak tablosu
+  if (R.leak) {
+    h = `<tr><th>Yol</th><th>Direnç</th><th>Gerilim</th><th>Akım</th><th>Güç</th></tr>`;
+    if (!R.leaks.length) h += `<tr><td colspan="5" style="text-align:left;color:var(--mut)">Kaçak direnci girilmedi (tümü ∞).</td></tr>`;
+    R.leaks.forEach(e => h += `<tr><td>${e.name}</td><td>${fmt(e.R, "Ω")}</td><td>${fmt(abs(e.U), "V")}</td><td>${fmt(abs(e.I), "A")}</td><td>${fmt(e.P, "W")}</td></tr>`);
+    if (!R.it) h += `<tr class="tot"><td>Net toprak akımı (fazörel)</td><td></td><td></td><td>${fmt(abs(R.Ires), "A")}</td><td>${fmt(R.Pleak, "W")}</td></tr>`;
+    else h += `<tr class="tot"><td>Toplam kaçak güç</td><td></td><td></td><td></td><td>${fmt(R.Pleak, "W")}</td></tr>`;
+    $("tLeak").innerHTML = h;
+  }
+}
+
+$("leakOn").addEventListener("change", update);
+$("bal").addEventListener("change", update);
+update();
+</script>
+</body>
+</html>
